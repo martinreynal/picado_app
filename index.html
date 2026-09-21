@@ -3557,6 +3557,25 @@ window.Plataforma = (function(){
    ============================================================ */
 (function(){
   if(window.PICADO) return;
+
+  /* VERSIÓN DE DATOS DE LA MAQUETA
+     El navegador guarda sesión, cuentas y perfiles por sitio. Si la maqueta
+     cambia de forma (una sesión de prueba vieja, por ejemplo), lo guardado queda
+     viejo y se restaura igual. Al cambiar esta versión, todo lo de PICADO
+     guardado en el navegador se borra una vez y la maqueta arranca limpia. */
+  var DEMO_VERSION = '2026-09-21';
+  try{
+    if(localStorage.getItem('picado.demo.version') !== DEMO_VERSION){
+      var viejas = [];
+      for(var i = 0; i < localStorage.length; i++){
+        var k = localStorage.key(i);
+        if(k && k.indexOf('picado.') === 0) viejas.push(k);
+      }
+      viejas.forEach(function(k){ localStorage.removeItem(k); });
+      localStorage.setItem('picado.demo.version', DEMO_VERSION);
+    }
+  }catch(e){}
+
   var K = { cuentas:'picado.demo.cuentas', sesion:'picado.demo.sesion', msgs:'picado.demo.mensajes',
             sigue:'picado.demo.seguimientos', post:'picado.demo.postulaciones' };
   /* localStorage con espejo en memoria: si el navegador lo bloquea, la sesión igual vive mientras dure la pestaña */
@@ -3580,13 +3599,13 @@ window.Plataforma = (function(){
      al arranque anónimo (y en Fase 2 esto se borra entero).
      ============================================================ */
   var MAQUETA_SESION = {
-    email: 'maximo.cozzeti@picado.app',
+    email: 'juan.lopez@picado.app',
     pass: 'picado2026',
-    nombre: 'Máximo Cozzeti',
+    nombre: 'Juan López',
     equipos: { e1: true },
     perfil: {
-      nombre: 'Máximo Cozzeti',
-      usuario: 'maximocozzeti',
+      nombre: 'Juan López',
+      usuario: 'juanlopez',
       numero: 10,
       posicion: 'Volante',
       edad: 27,
@@ -3624,6 +3643,8 @@ window.Plataforma = (function(){
     },
 
     /* Volver a entrar como el jugador de la maqueta (desde el login). */
+    nombreMaqueta: function(){ return MAQUETA_SESION ? MAQUETA_SESION.nombre : ''; },
+
     entrarMaqueta: function(){
       var s = sesionMaqueta();
       if(s && typeof window.picadoAplicarSesion === 'function') window.picadoAplicarSesion(s);
@@ -5332,7 +5353,7 @@ function jScreenLogin(){
       </div>
 
       ${window.PICADO && window.PICADO.entrarMaqueta ? `
-      <button class="btn btn-secondary" onclick="entrarMaqueta()">Entrar como Máximo Cozzeti</button>
+      <button class="btn btn-secondary" onclick="entrarMaqueta()">Entrar como ${escHtml(window.PICADO.nombreMaqueta())}</button>
       <div class="login-sub" style="margin:-4px 0 4px;">Jugador de prueba de la maqueta.</div>` : ''}
 
       ${Plataforma.googleDisponible() ? `
