@@ -3597,6 +3597,73 @@ html[data-app] .hero-picado { height: 150px; }
   margin-top: 11px; padding: 7px 12px 7px 15px; font-size: 14px;
   background: rgba(9, 10, 10, 0.6);
 }
+
+/* ============================================================
+   MENÚ INFERIOR — barra flotante
+   Tres pestañas con icono y nombre. El indicador (fondo iluminado
+   + línea en degradado) se desliza a la pestaña elegida.
+   ============================================================ */
+.tabbar {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+  margin: 0 10px calc(10px + var(--safe-bottom));
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 22px;
+  background: rgba(20, 22, 24, 0.86);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  overflow: hidden;
+}
+/* indicador deslizante: ocupa un tercio y se mueve con transform */
+.tb-marca {
+  position: absolute;
+  top: 0; left: 0; bottom: 0;
+  width: 33.3333%;
+  pointer-events: none;
+  transition: transform 240ms cubic-bezier(0.34, 0.9, 0.3, 1);
+  will-change: transform;
+}
+.tb-marca:before {
+  content: '';
+  position: absolute; inset: 5px 8px;
+  border-radius: 17px;
+  background: rgba(255, 255, 255, 0.055);
+}
+.tb-marca i {
+  position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+  width: 38px; height: 3px; border-radius: 0 0 3px 3px;
+  background: linear-gradient(90deg, var(--pitch), var(--gold));
+}
+.tab {
+  position: relative;
+  flex: 1;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  padding: 11px 4px 10px;
+  background: none; border: none;
+  color: rgba(242, 244, 245, 0.45);
+  font-family: inherit; font-size: 11.5px; font-weight: 500; letter-spacing: 0.04em;
+  transition: color 200ms ease;
+}
+.tab:before { display: none; }
+.tab .tb-ic { display: block; transition: transform 220ms cubic-bezier(0.34, 1.4, 0.5, 1); }
+.tab .tb-lb { line-height: 1; }
+.tab.active { color: #fff; font-weight: 600; }
+.tab.active .tb-ic { transform: scale(1.06); }
+.tab:active .tb-ic { transform: scale(0.92); }
+/* pequeño rebote del icono al llegar a la pestaña */
+.tab.saltar .tb-ic { animation: tb-salto 260ms cubic-bezier(0.34, 1.5, 0.5, 1); }
+@keyframes tb-salto {
+  0%   { transform: scale(0.88); }
+  55%  { transform: scale(1.16); }
+  100% { transform: scale(1.06); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tb-marca, .tab, .tab .tb-ic { transition: none; }
+  .tab.saltar .tb-ic { animation: none; }
+}
+html[data-app] .tabbar { padding-bottom: 0; margin-bottom: calc(10px + var(--safe-bottom)); }
 </style>
 </head>
 <body>
@@ -5645,14 +5712,54 @@ function jTabBar(){
   /* Tres entradas: PICADO (la comunidad) · INICIO (el centro de la app) · Perfil.
      Torneos y Falta 1 se entra desde Inicio, y el botón atrás vuelve ahí. */
   const tabs = [
-    {k:'feed',   lb:'PICADO'},
-    {k:'buscar', lb:'INICIO'},
-    {k:'perfil', lb:etiquetaPerfil()},
+    {k:'feed',   lb:'PICADO', ic:'layout'},
+    {k:'buscar', lb:'INICIO', ic:'play'},
+    {k:'perfil', lb:etiquetaPerfil(), ic:'user'},
   ];
-  return `<div class="tabbar">` + tabs.map(t=>`
-    <button class="tab ${tabActiva(t.k)?'active':''}" onclick="setState({jTab:'${t.k}', jTorneo:null, jDivision:null, jEquipo:null, jPartido:null})">
-      ${t.lb}
-    </button>`).join('') + `</div>`;
+  const activo = Math.max(0, tabs.findIndex(function(t){ return tabActiva(t.k); }));
+  return `
+    <nav class="tabbar" role="tablist" data-activo="${activo}">
+      <span class="tb-marca" aria-hidden="true"><i></i></span>
+      ${tabs.map(function(t, i){ return `
+        <button class="tab ${i === activo ? 'active' : ''}" role="tab" aria-selected="${i === activo}"
+                onclick="irATab('${t.k}')">
+          <span class="tb-ic">${ic(t.ic, 23)}</span>
+          <span class="tb-lb">${t.lb}</span>
+        </button>`; }).join('')}
+    </nav>
+  `;
+}
+
+/* Cambiar de pestaña: vibración corta y navegación. El desplazamiento del
+   indicador lo hace moverMarcaTab() después de dibujar. */
+function irATab(k){
+  if(S.jTab !== k) Plataforma.vibrar('suave');
+  setState({ jTab:k, jTorneo:null, jDivision:null, jEquipo:null, jPartido:null });
+}
+
+/* El menú se vuelve a dibujar en cada render, así que el indicador nacería
+   ya en su lugar y no habría transición. Se lo coloca en la posición anterior
+   y recién en el siguiente cuadro se lo manda a la nueva: ahí sí se desliza. */
+let TAB_PREV = null;
+function moverMarcaTab(){
+  const barra = document.querySelector('.tabbar');
+  if(!barra) return;
+  const marca = barra.querySelector('.tb-marca');
+  const activo = Number(barra.getAttribute('data-activo')) || 0;
+  if(!marca) return;
+  const desde = (TAB_PREV === null ? activo : TAB_PREV);
+  marca.style.transition = 'none';
+  marca.style.transform = 'translateX(' + (desde * 100) + '%)';
+  void marca.offsetWidth;                      // fuerza el cálculo antes de animar
+  requestAnimationFrame(function(){
+    marca.style.transition = '';
+    marca.style.transform = 'translateX(' + (activo * 100) + '%)';
+  });
+  if(desde !== activo){
+    const ic = barra.querySelectorAll('.tab')[activo];
+    if(ic){ ic.classList.remove('saltar'); void ic.offsetWidth; ic.classList.add('saltar'); }
+  }
+  TAB_PREV = activo;
 }
 
 /* INICIO — carrusel vertical de videos a pantalla completa (estilo TikTok).
@@ -7993,6 +8100,7 @@ function render(){
   }
   try { activarReel(); } catch(e) { console.error('reel', e); }
   try { montarFuentesSueltas(); } catch(e) { console.error('fuentes', e); }
+  try { moverMarcaTab(); } catch(e) { console.error('tabbar', e); }
   document.querySelectorAll('.brand-logo').forEach(function(img){ if(!img.getAttribute('src')) img.src = LOGO_PICADO; });
   if(focoId){
     const el = document.getElementById(focoId);
