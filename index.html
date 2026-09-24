@@ -5200,6 +5200,30 @@ html[data-app] .tabbar {
 .reel-partido:hover { border-color: var(--pitch); }
 .reel-partido svg:first-child { color: var(--pitch); }
 .reel-partido svg:last-child { color: rgba(255, 255, 255, 0.55); }
+
+/* ---- perfil: contexto y contadores ---- */
+.perfil-contexto {
+  display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px 14px;
+  margin-top: 2px; font-size: 13.5px; color: var(--chalk-dim);
+}
+.perfil-contexto > span { display: inline-flex; align-items: center; gap: 6px; }
+.perfil-contexto svg { color: var(--chalk-faint); }
+.pc-eq { color: var(--pitch); cursor: pointer; }
+.pc-eq svg { color: var(--pitch); }
+.pc-eq:hover { color: #9fefff; }
+.perfil-cont {
+  display: flex; width: 100%; margin: 16px 0 2px;
+  background: var(--card); border: 1px solid var(--card-line); border-radius: 14px;
+  overflow: hidden;
+}
+.perfil-cont button {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 13px 4px; background: none; border: none; color: var(--chalk); font-family: inherit;
+}
+.perfil-cont button + button { border-left: 1px solid var(--card-line); }
+.perfil-cont b { font-family: var(--font-mono); font-size: 18px; font-weight: 500; }
+.perfil-cont i { font-style: normal; font-size: 12px; color: var(--chalk-dim); }
+.perfil-cont button:hover b { color: var(--pitch); }
 </style>
 </head>
 <body>
@@ -8428,6 +8452,31 @@ function jReelOverlay(){
   `;
 }
 
+/* Línea de contexto: equipo (lleva a su ficha) y zona. Es lo mínimo que
+   hace falta para saber quién es alguien en la cancha. */
+function lineaContexto(equipo, zona, extra){
+  const partes = [];
+  if(equipo) partes.push(`<span class="pc-eq" onclick="abrirEquipoDesdeReel(${jsq(equipo)})">${ic('shield', 15)}${escHtml(equipo)}</span>`);
+  if(extra) partes.push(`<span>${ic('user', 15)}${escHtml(extra)}</span>`);
+  if(zona) partes.push(`<span>${ic('pin', 15)}${escHtml(zona)}</span>`);
+  if(!partes.length) return '';
+  return `<div class="perfil-contexto">${partes.join('')}</div>`;
+}
+
+/* Clips, seguidores y siguiendo. Cada uno lleva a donde corresponde. */
+function jContadoresPerfil(){
+  const clips = (JUGADOR.feed || []).length;
+  const seguidores = (JUGADOR.seguidores || []).length;
+  const siguiendo = Object.keys(S.jFollowing || {}).filter(function(n){ return S.jFollowing[n]; }).length;
+  return `
+    <div class="perfil-cont">
+      <button onclick="setState({jPerfilTab:'clips'})"><b>${clips}</b><i>Clips</i></button>
+      <button onclick="setState({jFollowersOpen:true, jFollowersTab:'seguidores'})"><b>${seguidores}</b><i>Seguidores</i></button>
+      <button onclick="setState({jFollowersOpen:true, jFollowersTab:'siguiendo'})"><b>${siguiendo}</b><i>Siguiendo</i></button>
+    </div>
+  `;
+}
+
 function jPerfil(){
   if(!S.loggedIn) return `<div class="empty">Creá tu cuenta para tener tu perfil.</div>`;
   return `
@@ -8452,8 +8501,11 @@ function jPerfil(){
       </label>
       <div class="perfil-nombre">${JUGADOR.nombre || 'Tu nombre'}</div>
       ${JUGADOR.usuario ? `<div class="perfil-handle">@${JUGADOR.usuario}</div>` : ''}
+      ${lineaContexto(JUGADOR.equipo, JUGADOR.ubicacion)}
       <button class="btn btn-primary perfil-publicar" onclick="document.getElementById('subirHub').click()">${ic('plus', 18)} Publicar</button>
     </div>
+
+    ${jContadoresPerfil()}
 
     <div class="perfil-tabs">
       <button class="${S.jPerfilTab==='clips'?'active':''}" onclick="setState({jPerfilTab:'clips'})">Clips</button>
@@ -8796,6 +8848,12 @@ function jProfileOverlay(){
           </div>
           <div class="perfil-nombre">${name}</div>
           <div class="perfil-handle">@${handleDe(name)}</div>
+          ${(function(){
+            const p = directorio().find(function(x){ return x.n === name; }) || {};
+            const eq = isMe ? JUGADOR.equipo : (p.eq && p.eq.indexOf('Cuenta creada') === -1 ? p.eq : null);
+            const pos = isMe ? JUGADOR.posicion : (p.pos && p.pos !== 'Nuevo en PICADO' ? p.pos : null);
+            return lineaContexto(eq, isMe ? JUGADOR.ubicacion : null, pos);
+          })()}
         </div>
         ${isMe ? `
           <div class="card" style="text-align:center;color:var(--chalk-dim);font-size:12.5px;">Este perfil es el tuyo 🙂</div>
